@@ -7,7 +7,7 @@ description: Turn a question and a few seed ideas into a live, AI-growing mind m
 
 Creates a fresh Mind Mapper artifact for a question, pre-seeded with ideas. The user then drags, links, unlinks, edits and auto-grows the map in the page itself.
 
-Template artifact slug: `e7581db2-a56c-4c5e-9ff7-8de45db41393` ("Mind Mapper", https://claude.ai/artifact/VZudQ7tZMfkftxLBEWf3eA).
+Template artifact: "Mind Mapper", https://claude.ai/artifact/VZudQ7tZMfkftxLBEWf3eA (the `<template URL>` below). It publishes `app.js` and `app.css` beside its page.
 
 ## 1. Get the question and seeds
 
@@ -24,21 +24,39 @@ Design-thinking rules for any ideas you write:
 - build on ideas ("Yes, and…")
 - keep each idea a short, vivid phrase
 
-## 2. Build the page from the template
+## 2. Publish a small page that reuses the template's code
 
-1. Load the artifact tools with ToolSearch if they're deferred: `select:mcp__claude-artifacts__read_artifact,mcp__claude-artifacts__publish_version,mcp__claude-artifacts__declare_capabilities`.
-2. Call `read_artifact` on the template slug to get its HTML.
-3. Find the exact string `<script type="application/json" id="seed"></script>`. Put JSON inside it:
-   `{"id":"<random 8 chars>","q":"<question>","ctx":"<context or empty>","seeds":["…","…"]}`
-   Escape it as valid JSON, and replace every `</` with `<\/` and every `<!--` with `\u003c!--` so the script tag can't close early. Change nothing else in the page. Seeds must be non-empty strings; if the block has a question but no usable seeds, the page opens its setup screen prefilled instead.
-4. Publish it as a **new** artifact with `publish_version`:
-   - omit the slug
-   - title: `Mind map: <question shortened to about 6 words>`
-   - icon: `map`
-   - content: the full edited HTML
-5. Call `declare_capabilities` on the new slug. Use the version returned by the publish, and pass `{"sample": {}}` so the page can generate ideas.
+The app's code lives in the template's `app.js` and `app.css`. Each map is a new artifact whose only page is a ~15-line shell holding the seed block. The two big files are copied from the template on the server, so you never read or resend them. That keeps this step to a few seconds.
 
-If the template can't be read, tell the user and give them the template link. They can type the question and seeds into its setup screen themselves.
+1. Write this file to your scratchpad as `index.html`. Change only the `<title>` and the seed block contents:
+
+   ```html
+   <!DOCTYPE html>
+   <html lang="en">
+   <head>
+   <meta charset="utf-8">
+   <meta name="viewport" content="width=device-width, initial-scale=1">
+   <title>Mind map: QUESTION_SHORT</title>
+   <link rel="preconnect" href="https://fonts.googleapis.com">
+   <link href="https://fonts.googleapis.com/css2?family=Source+Serif+4:ital,opsz,wght@0,8..60,400;0,8..60,600;0,8..60,800;1,8..60,400&family=Instrument+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+   <link rel="stylesheet" href="app.css">
+   </head>
+   <body>
+   <script type="application/json" id="seed">SEED_JSON</script>
+   <script src="app.js"></script>
+   </body>
+   </html>
+   ```
+
+   - `QUESTION_SHORT`: the question cut to about 6 words, HTML-escaped (`&` → `&amp;`, `<` → `&lt;`).
+   - `SEED_JSON`: `{"id":"<random 8 chars>","q":"<question>","ctx":"<context or empty>","seeds":["…","…"]}` as valid JSON. Then replace every `<` with `\u003c` so the script tag can't close early. Seeds must be non-empty strings. If the block has a question but no usable seeds, the page opens its setup screen prefilled instead.
+2. Publish it as a **new** artifact (no `url`) with the Artifact tool:
+   - `file_path`: that `index.html`
+   - `icon`: `map`
+   - `files`: `{"app.js": {"artifact": "<template URL>", "path": "app.js"}, "app.css": {"artifact": "<template URL>", "path": "app.css"}}`
+   - `capabilities`: `{"sample": {}}` so the page can generate ideas
+
+If the publish fails because the template's files can't be copied, tell the user and give them the template link. They can type the question and seeds into its setup screen themselves.
 
 ## 3. Reply
 

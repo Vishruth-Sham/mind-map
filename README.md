@@ -1,6 +1,6 @@
 # Mind Mapper
 
-A single-file, no-build mind-map brainstorming tool (`app/index.html`). Enter a question and a few seed ideas. The question becomes the root and each seed becomes a branch. Then grow the map by hand or with AI.
+A no-build mind-map brainstorming tool (`app/index.html`). Enter a question and a few seed ideas. The question becomes the root and each seed becomes a branch. Then grow the map by hand or with AI.
 
 ## Features
 - Drag nodes. Shift-click or shift-drag a marquee to select several and drag them together. Pan with the wheel or by dragging the canvas, zoom with Ctrl/⌘+wheel or a two-finger pinch, and use Fit.
@@ -25,7 +25,7 @@ A single-file, no-build mind-map brainstorming tool (`app/index.html`). Enter a 
 The page calls `const sample = await window.claude.use('sample')`. `sample.json(prompt)` should return an array of strings; objects with `idea`/`text` fields are also accepted. If `.json` is missing or fails, the page uses `sample(prompt)` → `{text}` and pulls a JSON array out of the text instead. Outside the claude.ai host, or if `use` fails, `sample` is null: the grow controls are disabled, the top bar says "generation off", and everything else still works. Error codes are handled: `rate_limited` shows a toast, and `not_granted` turns generation off.
 
 ## The /mind-map skill
-`skill/mind-map/SKILL.md` copies the template artifact, fills `<script type="application/json" id="seed"></script>` with `{"id","q","ctx","seeds"}` (escaping `</`), publishes it as a new artifact and declares the `sample` capability. The `id` namespaces the localStorage key, so each map keeps its own state. To install it, copy `skill/mind-map/` into your Claude skills directory (or upload it as a skill in claude.ai), then type `/mind-map How might we …? | seed; seed; seed`.
+The page is split so each map is cheap to make. `app/index.html` is a ~15-line shell holding only `<script type="application/json" id="seed"></script>`; the UI, styles and logic live in `app/app.js` and `app/app.css`. `skill/mind-map/SKILL.md` writes a shell whose seed block holds `{"id","q","ctx","seeds"}` (with `<` escaped as `\u003c`). It then publishes that shell as a new artifact, copies `app.js` and `app.css` from the template artifact server-side and declares the `sample` capability. So the skill only writes a few lines instead of re-sending the 60 KB page. The `id` namespaces the localStorage key, so each map keeps its own state. To install it, copy `skill/mind-map/` into your Claude skills directory (or upload it as a skill in claude.ai), then type `/mind-map How might we …? | seed; seed; seed`.
 
 ## Tests
 ```

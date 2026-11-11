@@ -163,7 +163,12 @@ def test_select_edge_and_unlink_with_button_and_delete_key(m):
     a = m.id_of("Alpha")
     k = "n1|root" if "n1|root" in m.edges() else m.edges()[0]
     def click_edge(key):
-        x, y = m.ev("""(k)=>{const g=edgeGeom(k);return [g.mx*V.k+V.x,g.my*V.k+V.y]}""", key)
+        # Aim at the first point along the curve that isn't covered by a node (font metrics vary
+        # by platform, so the midpoint can sit under a node's link handle).
+        x, y = m.ev("""(k)=>{const g=edgeGeom(k),A=P(g.a),B=P(g.b),C={x:2*g.mx-(A.x+B.x)/2,y:2*g.my-(A.y+B.y)/2};
+          for(const t of [.5,.4,.6,.3,.7,.2,.8]){const u=1-t,wx=u*u*A.x+2*u*t*C.x+t*t*B.x,wy=u*u*A.y+2*u*t*C.y+t*t*B.y,
+            x=wx*V.k+V.x,y=wy*V.k+V.y,e=document.elementFromPoint(x,y);if(e&&e.dataset&&e.dataset.k===k)return [x,y]}
+          return [g.mx*V.k+V.x,g.my*V.k+V.y]}""", key)
         m.page.mouse.click(x, y)
     click_edge(k)
     assert m.ev("selEdge") == k

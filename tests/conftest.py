@@ -8,6 +8,7 @@ import json
 import os
 import pathlib
 import re
+import shutil
 
 import pytest
 from playwright.sync_api import sync_playwright
@@ -99,6 +100,8 @@ class App:
         html = APP.read_text(encoding="utf-8")
         assert html.count(SEED_TAG) == 1
         body = raw if raw is not None else json.dumps(seed, ensure_ascii=False).replace("</", "<\\/")
+        for asset in ("app.js", "app.css"):   # the shell loads these from beside itself
+            shutil.copyfile(APP.parent / asset, self.tmp_path / asset)
         out = self.tmp_path / "seeded.html"
         out.write_text(html.replace(SEED_TAG, '<script type="application/json" id="seed">' + body + "</script>"),
                        encoding="utf-8")
