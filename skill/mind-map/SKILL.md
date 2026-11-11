@@ -30,7 +30,7 @@ Design-thinking rules for any ideas you write:
 2. Call `read_artifact` on the template slug to get its HTML.
 3. Find the exact string `<script type="application/json" id="seed"></script>`. Put JSON inside it:
    `{"id":"<random 8 chars>","q":"<question>","ctx":"<context or empty>","seeds":["…","…"]}`
-   Escape it as valid JSON, and replace every `</` with `<\/` so the script tag can't close early. Change nothing else in the page.
+   Escape it as valid JSON, and replace every `</` with `<\/` and every `<!--` with `\u003c!--` so the script tag can't close early. Change nothing else in the page. Seeds must be non-empty strings; if the block has a question but no usable seeds, the page opens its setup screen prefilled instead.
 4. Publish it as a **new** artifact with `publish_version`:
    - omit the slug
    - title: `Mind map: <question shortened to about 6 words>`
