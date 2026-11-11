@@ -7,7 +7,7 @@ description: Turn a question and a few seed ideas into a live, AI-growing mind m
 
 Creates a fresh Mind Mapper artifact for a question, pre-seeded with ideas. The user then drags, links, unlinks, edits and auto-grows the map in the page itself.
 
-Template artifact: "Mind Mapper", https://claude.ai/artifact/VZudQ7tZMfkftxLBEWf3eA (the `<template URL>` below). It publishes `app.js` and `app.css` beside its page.
+The app's code ships with this skill: `app.js` and `app.css` sit next to this file, in the skill's base directory.
 
 ## 1. Get the question and seeds
 
@@ -24,11 +24,12 @@ Design-thinking rules for any ideas you write:
 - build on ideas ("Yes, and…")
 - keep each idea a short, vivid phrase
 
-## 2. Publish a small page that reuses the template's code
+## 2. Publish a small page plus the bundled app files
 
-The app's code lives in the template's `app.js` and `app.css`. Each map is a new artifact whose only page is a ~15-line shell holding the seed block. The two big files are copied from the template on the server, so you never read or resend them. That keeps this step to a few seconds.
+Each map is a new artifact: a ~15-line page holding the seed block, with `app.js` and `app.css` published beside it. Copy those two files with a shell command and never open, read or retype them; that keeps this step to a few seconds.
 
-1. Write this file to your scratchpad as `index.html`. Change only the `<title>` and the seed block contents:
+1. Make a fresh folder for this map in your scratchpad directory (if you have none, use a new folder under the working directory). Copy the two files into it with one shell command, e.g. `cp "<skill base directory>/app.js" "<skill base directory>/app.css" "<folder>/"`.
+2. In the same folder, write `index.html` with this content. Change only the `<title>` and the seed block contents:
 
    ```html
    <!DOCTYPE html>
@@ -50,13 +51,13 @@ The app's code lives in the template's `app.js` and `app.css`. Each map is a new
 
    - `QUESTION_SHORT`: the question cut to about 6 words, HTML-escaped (`&` → `&amp;`, `<` → `&lt;`).
    - `SEED_JSON`: `{"id":"<random 8 chars>","q":"<question>","ctx":"<context or empty>","seeds":["…","…"]}` as valid JSON. Then replace every `<` with `\u003c` so the script tag can't close early. Seeds must be non-empty strings. If the block has a question but no usable seeds, the page opens its setup screen prefilled instead.
-2. Publish it as a **new** artifact (no `url`) with the Artifact tool:
-   - `file_path`: that `index.html`
+3. Publish it as a **new** artifact (no `url`) with the Artifact tool:
+   - `file_path`: `<folder>/index.html`
+   - `files`: `{"app.js": "<folder>/app.js", "app.css": "<folder>/app.css"}`
    - `icon`: `map`
-   - `files`: `{"app.js": {"artifact": "<template URL>", "path": "app.js"}, "app.css": {"artifact": "<template URL>", "path": "app.css"}}`
    - `capabilities`: `{"sample": {}}` so the page can generate ideas
 
-If the publish fails because the template's files can't be copied, tell the user and give them the template link. They can type the question and seeds into its setup screen themselves.
+If publishing fails, tell the user why. They can still open `app/index.html` from the repo in a browser and type the question and seeds into its setup screen (idea generation is off outside claude.ai).
 
 ## 3. Reply
 

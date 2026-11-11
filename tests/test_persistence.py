@@ -207,3 +207,12 @@ def test_malformed_seed_json_shows_setup(app):
 def test_template_keeps_exact_empty_seed_tag():
     from conftest import APP, SEED_TAG
     assert APP.read_text(encoding="utf-8").count(SEED_TAG) == 1
+
+
+@pytest.mark.parametrize("name", ["app.js", "app.css"])
+def test_skill_bundles_current_app_files(name):
+    """The /mind-map skill ships its own copy of the app; it must match app/."""
+    from conftest import APP
+    bundled = APP.parent.parent / "skill" / "mind-map" / name
+    assert bundled.read_bytes() == (APP.parent / name).read_bytes(), \
+        f"skill/mind-map/{name} is stale: run  cp app/app.js app/app.css skill/mind-map/"
