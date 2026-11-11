@@ -2,9 +2,7 @@
 
 # Mind Mapper
 
-**Ask a question. Plant a few seeds. Watch them branch into ideas you didn't expect.**
-
-A brainstorming canvas for claude.ai. Every idea can grow with Claude, plus a `/mind-map` skill that builds you a fresh map from one line in Claude Code.
+A brainstorming canvas for Claude, with a `/mind-map` skill.
 
 ![MIT license](https://img.shields.io/badge/license-MIT-E5493A?style=flat-square)
 ![No build step](https://img.shields.io/badge/build-none-1B1A18?style=flat-square)
@@ -26,9 +24,6 @@ Claude Code publishes a private map on claude.ai with your question in the middl
 | 1. Plant your seeds | 2. Get a map | 3. Take it anywhere |
 |:---:|:---:|:---:|
 | <img src="docs/screenshots/1-setup.jpg" alt="Setup screen with the question and three seed chips" width="100%"> | <img src="docs/screenshots/2-seeded-map.jpg" alt="Fresh map with the AI toolbar open on a seed" width="100%"> | <img src="docs/screenshots/4-mobile.jpg" alt="The same map on a phone" width="60%"> |
-
-<sub>The ideas in these screenshots are examples written for the docs. In the real app they come from Claude.</sub>
-
 ## Install the skill
 
 You need [Claude Code](https://claude.com/claude-code).
