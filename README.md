@@ -4,11 +4,6 @@
 
 A brainstorming canvas for Claude, with a `/mind-map` skill.
 
-![MIT license](https://img.shields.io/badge/license-MIT-E5493A?style=flat-square)
-![No build step](https://img.shields.io/badge/build-none-1B1A18?style=flat-square)
-![128 tests](https://img.shields.io/badge/tests-128%20passing-58C98F?style=flat-square)
-![Claude Code skill](https://img.shields.io/badge/Claude%20Code-skill-A6DCE0?style=flat-square)
-
 <img src="docs/screenshots/3-grown-map.jpg" alt="A grown mind map for 'How might we make Monday mornings fun?' with three coloured seed branches and a dozen ideas" width="100%">
 
 </div>
