@@ -59,6 +59,20 @@ def test_grow_modes(make_app, mode, phrase):
     assert "4 generated" in app.page.text_content("#meta")
 
 
+def test_grow_prompt_uses_only_the_path_from_the_root(make_app):
+    app = ai_map(make_app)
+    grow_btn(app, app.id_of("Alpha"))
+    wait_idle(app)
+    child = app.id_of("Idea 1")
+    app.ev("(id)=>grow(id,'yes',4)", child)
+    wait_idle(app)
+    prompt = app.ev("window.__calls[window.__calls.length-1].prompt")
+    assert "How might we test this? → Alpha → Idea 1" in prompt
+    # siblings, other branches and the idea's own neighbours stay out of it
+    for other in ("Beta", "Gamma", "Idea 2", "Idea 3", "Idea 4"):
+        assert other not in prompt, other
+
+
 def test_grow_root_makes_new_seed_branches(make_app):
     app = ai_map(make_app)
     grow_btn(app, "root")

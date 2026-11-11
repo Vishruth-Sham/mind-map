@@ -397,10 +397,9 @@ async function grow(id,mode='yes',n=4,limit=Infinity){
   if(!sample){toast('Idea generation is off in this view. You can still add ideas by hand.');throw{code:'none'}}
   if(!S.nodes[id]||busy.has(id))return;
   const node=N(id),{prev}=bfs(),ep=epoch;
-  const near=nbrs(id).map(i=>N(i).text);
+  // New ideas depend only on the ideas along the path from the question to this one.
   const prompt=head()+`Path from the question to this idea: ${pathTo(id,prev).join(' → ')}
 Idea to grow from: "${node.text}"
-Already connected to it (don't repeat): ${near.join(' | ')||'nothing yet'}
 Task: ${id==='root'?'Generate fresh, distinct directions that answer the question.':MODES[mode].ins}
 Generate ${n} new ideas. Each one a vivid, specific phrase of 14 words or fewer. No numbering, no explanations.
 Return only a JSON array of strings.`;
