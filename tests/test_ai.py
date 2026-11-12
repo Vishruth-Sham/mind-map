@@ -395,3 +395,13 @@ def test_duplicate_ideas_are_skipped(make_app):
     grow_btn(app, a)
     wait_idle(app)
     assert len([n for n in app.nodes().values() if n["ai"]]) == 4
+
+
+def test_keep_growing_never_uses_wilder(make_app):
+    app = ai_map(make_app, delay=20)
+    app.page.click("#grow")
+    app.page.wait_for_function("window.__calls.length>=8", timeout=15000)
+    app.page.click("#grow")
+    wait_idle(app)
+    prompts = app.ev("window.__calls.map(c=>c.prompt)")
+    assert not any("Push it wild" in pr for pr in prompts)

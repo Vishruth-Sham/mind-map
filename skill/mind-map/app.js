@@ -469,7 +469,7 @@ function pickTarget(){
   const d=i=>dist[i]==null?99:dist[i];const m=Math.min(...pool.map(d));pool=pool.filter(i=>d(i)===m);
   return pool[Math.floor(Math.random()*pool.length)];
 }
-const MODEKEYS=['yes','yes','wild','real','flip'];
+const MODEKEYS=['yes','yes','real','flip'];   // Keep growing's styles: no Wilder (that's on the button only)
 async function growLoop(){
   const me=++loopId;let modeIx=0;   // only the newest loop may run: stop+start must not leave two going
   const live=()=>growing&&me===loopId;
