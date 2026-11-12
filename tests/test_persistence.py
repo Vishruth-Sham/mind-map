@@ -217,3 +217,37 @@ def test_skill_bundles_current_app_files(name):
     bundled = APP.parent.parent / "skill" / "mind-map" / name
     assert bundled.read_bytes() == (APP.parent / name).read_bytes(), \
         f"skill/mind-map/{name} is stale: run  cp app/app.js app/app.css skill/mind-map/"
+
+
+def test_save_image_downloads_a_png(app):
+    app.open().build(q="How might we test this?", seeds=["Alpha", "Beta"])
+    app.select(app.id_of("Alpha"))
+    app.page.keyboard.press("s")
+    app.page.click("#export")
+    with app.page.expect_download() as d:
+        app.page.click("#exPng")
+    assert d.value.suggested_filename == "how-might-we-test-this.png"
+    data = open(d.value.path(), "rb").read()
+    assert data[:8] == b"\x89PNG\r\n\x1a\n" and len(data) > 5000
+    assert app.toast() == "Image saved"
+
+
+def test_save_image_uses_downloads_capability_when_present(app):
+    app.page.add_init_script("""window.__saved=null;window.claude={use:async n=>n==='downloads'?
+      {save:async r=>{window.__saved={name:r.filename,size:r.data.size,type:r.data.type};return {status:'saved'}}}:null}""")
+    app.open().build(q="Q?", seeds=["Alpha"])
+    app.page.click("#export")
+    app.page.click("#exPng")
+    app.page.wait_for_function("window.__saved")
+    s = app.ev("window.__saved")
+    assert s["name"] == "q.png" and s["type"] == "image/png" and s["size"] > 2000
+
+
+def test_declined_image_save_is_quiet(app):
+    app.page.add_init_script("window.claude={use:async n=>n==='downloads'?{save:async()=>{throw {code:'declined'}}}:null}")
+    app.open().build(seeds=["Alpha"])
+    app.ev("toast('')")
+    app.page.click("#export")
+    app.page.click("#exPng")
+    app.settle(200)
+    assert app.toast() == ""

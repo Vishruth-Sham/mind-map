@@ -63,10 +63,10 @@ document.getElementById('seed').insertAdjacentHTML('beforebegin',String.raw`<div
 <div id="exp" hidden>
   <div class="card">
     <h2>Take it with you</h2>
-    <p>Copy the outline into a doc, or copy the map file to keep a backup. To bring a map back in, paste its file below and choose Import.</p>
+    <p>Copy the outline into a doc, copy the map file to keep a backup, or save the whole map as a PNG image. To bring a map back in, paste its file below and choose Import.</p>
     <div class="row" style="margin:0 0 10px"><button class="pill on" id="tOut">Outline</button><button class="pill" id="tJson">Map file</button></div>
     <textarea id="extext" spellcheck="false"></textarea>
-    <div class="row"><button class="pill red" id="exCopy">Copy</button><button class="pill" id="exImp">Import</button><span style="flex:1"></span><button class="pill" id="exClose">Close</button></div>
+    <div class="row"><button class="pill red" id="exCopy">Copy</button><button class="pill" id="exImp">Import</button><button class="pill" id="exPng">Save image</button><span style="flex:1"></span><button class="pill" id="exClose">Close</button></div>
   </div>
 </div>`);
 
@@ -605,6 +605,56 @@ $('exCopy').onclick=async()=>{try{await navigator.clipboard.writeText($('extext'
 $('exImp').onclick=()=>{let v=null,raw=null;try{raw=JSON.parse($('extext').value);v=clean(raw)}catch(e){}
   if(!v)return toast('That isn\'t a map file. Paste one exported from here, then choose Import.');
   stopGrowing();epoch++;busy.clear();endLink();closeChat(true);commit();S=v;CH=cleanChats(raw.chats,v);sel.clear();selEdge=null;save();render();fit();$('exp').hidden=true;toast('Imported')};
+
+/* image export: redraw the map onto a canvas from the live layout and save a PNG */
+function rrect(g,x,y,w,h,r){g.beginPath();g.moveTo(x+r,y);g.arcTo(x+w,y,x+w,y+h,r);g.arcTo(x+w,y+h,x,y+h,r);g.arcTo(x,y+h,x,y,r);g.arcTo(x,y,x+w,y,r);g.closePath()}
+function wrapText(g,t,max){const out=[];t.split(/\s+/).filter(Boolean).forEach(w=>{
+  while(g.measureText(w).width>max&&w.length>1){let i=w.length;while(i>1&&g.measureText(w.slice(0,i)).width>max)i--;
+    const last=out.length?out[out.length-1]:'';if(last&&g.measureText(last+' '+w.slice(0,i)).width<=max)out[out.length-1]=last+' '+w.slice(0,i);else out.push(w.slice(0,i));w=w.slice(i)}
+  const last=out.length?out[out.length-1]:null;if(last!=null&&g.measureText(last+' '+w).width<=max)out[out.length-1]=last+' '+w;else out.push(w)});return out.length?out:['']}
+function mapCanvas(){
+  const ns=Object.values(S.nodes).filter(n=>els[n.id]);if(!ns.length)return null;
+  const M=60;let x0=1e9,y0=1e9,x1=-1e9,y1=-1e9;
+  ns.forEach(n=>{const r=Math.hypot(n._w,n._h)/2*(n.id==='root'?0:1),w=Math.max(n._w/2,r)+14,h=Math.max(n._h/2,r)+16;
+    x0=Math.min(x0,n.x-w);x1=Math.max(x1,n.x+w);y0=Math.min(y0,n.y-h);y1=Math.max(y1,n.y+h)});
+  x0-=M;y0-=M;x1+=M;y1+=M;const W=x1-x0,H=y1-y0;
+  const k=Math.max(.25,Math.min(2,8000/W,8000/H,Math.sqrt(3.2e7/(W*H))));
+  const cv=document.createElement('canvas');cv.width=Math.round(W*k);cv.height=Math.round(H*k);
+  const g=cv.getContext('2d');g.scale(k,k);g.translate(-x0,-y0);
+  const css=getComputedStyle(document.documentElement),v=n=>css.getPropertyValue(n).trim();
+  g.fillStyle=v('--paper')||'#F7F4EC';g.fillRect(x0,y0,W,H);
+  g.fillStyle='rgba(27,26,24,.10)';for(let x=Math.ceil(x0/28)*28;x<x1;x+=28)for(let y=Math.ceil(y0/28)*28;y<y1;y+=28){g.beginPath();g.arc(x,y,1.1,0,7);g.fill()}
+  g.save();g.strokeStyle=v('--ink')||'#1B1A18';g.globalAlpha=.55;g.lineWidth=1.6;g.lineCap='round';
+  S.edges.forEach(e=>{const ge=edgeGeom(e);if(ge){g.stroke(new Path2D(ge.d))}});g.restore();
+  ns.forEach(n=>{const el=els[n.id],cs=getComputedStyle(el),tx=el.querySelector('.tx'),ts=getComputedStyle(tx);
+    const w=n._w,h=n._h,px=parseFloat,bt=px(cs.borderTopWidth),bl=px(cs.borderLeftWidth),rad=px(cs.borderTopLeftRadius)||0;
+    g.save();g.translate(n.x,n.y);g.rotate((n.id==='root'?0:n.r)*Math.PI/180);g.translate(-w/2,-h/2);
+    const sh=cs.boxShadow.match(/(rgba?\([^)]*\))\s+(-?[\d.]+)px\s+(-?[\d.]+)px/);
+    if(sh){g.fillStyle=sh[1];rrect(g,+sh[2],+sh[3],w,h,rad);g.fill()}
+    g.fillStyle=cs.backgroundColor;rrect(g,0,0,w,h,rad);g.fill();
+    g.save();rrect(g,0,0,w,h,rad);g.clip();g.fillStyle=cs.borderTopColor;g.fillRect(0,0,w,bt);g.restore();
+    g.strokeStyle=cs.borderLeftColor;g.lineWidth=bl;if(cs.borderLeftStyle==='dashed')g.setLineDash([bl*3,bl*2]);
+    rrect(g,bl/2,bl/2,w-bl,h-bl,Math.max(0,rad-bl/2));g.stroke();g.setLineDash([]);
+    g.fillStyle=ts.color;g.font=`${ts.fontStyle} ${ts.fontWeight} ${ts.fontSize} ${ts.fontFamily}`;g.textBaseline='middle';
+    const pl=px(cs.paddingLeft),pr=px(cs.paddingRight),pt=px(cs.paddingTop),lh=px(ts.lineHeight)||px(ts.fontSize)*1.3;
+    const cw=tx.clientWidth||w-pl-pr-2*bl,lines=wrapText(g,n.text,cw+.5),c=ts.textAlign==='center';
+    g.textAlign=c?'center':'left';lines.forEach((l,i)=>g.fillText(l,bl+pl+(c?cw/2:0),bt+pt+lh*i+lh/2));
+    if(n.star){g.translate(w+1,-1);g.rotate(12*Math.PI/180);g.fillStyle=v('--red')||'#E5493A';g.beginPath();g.arc(0,0,13,0,7);g.fill();
+      g.strokeStyle=v('--ink')||'#1B1A18';g.lineWidth=1.6;g.stroke();g.fillStyle='#fff';g.beginPath();
+      for(let i=0;i<10;i++){const a=-Math.PI/2+i*Math.PI/5,r=i%2?2.8:6.5;g.lineTo(Math.cos(a)*r,Math.sin(a)*r)}g.closePath();g.fill()}
+    g.restore()});
+  return cv}
+const slug=t=>(t||'mind-map').toLowerCase().replace(/[^a-z0-9]+/g,'-').replace(/^-|-$/g,'').slice(0,60)||'mind-map';
+async function savePng(){
+  const cv=mapCanvas();if(!cv)return toast('Nothing to save yet.');
+  const blob=await new Promise(r=>cv.toBlob(r,'image/png'));if(!blob)return toast('Couldn\'t make the image. Try zooming out and saving again.');
+  const name=slug(S.q)+'.png';let dl=null;
+  try{dl=window.claude&&typeof window.claude.use==='function'?await window.claude.use('downloads'):null}catch(e){dl=null}
+  if(dl){try{await dl.save({filename:name,data:blob});toast('Image saved')}catch(e){
+    if(e&&e.code==='declined')return;toast(e&&e.code==='rate_limited'?'A save is already waiting for you. Answer it first.':'Saving images isn\'t available here.')}return}
+  const a=document.createElement('a'),u=URL.createObjectURL(blob);a.href=u;a.download=name;document.body.appendChild(a);a.click();a.remove();
+  setTimeout(()=>URL.revokeObjectURL(u),4000);toast('Image saved')}
+$('exPng').onclick=savePng;
 
 /* keyboard */
 document.addEventListener('keydown',e=>{

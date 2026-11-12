@@ -40,7 +40,7 @@ If you give fewer than 3 seeds, Claude tops up to 6 and marks which ones it adde
 - **Chat with any idea:** press **Chat** (or `C`) on an idea to talk it through with Claude in a side panel. Then press **Grow from this chat** to add new ideas shaped by what you said. Each idea keeps its own chat.
 - **Link anything:** press `L` (or **Link**) and click another idea. Drag the corner handle onto an idea, or onto empty space to spawn a new one. Click a line to unlink it.
 - **Arrange it:** drag, shift-drag to select many, pan, pinch or ⌘-scroll to zoom, and **Tidy** for an automatic layout.
-- **Never lose anything:** undo/redo covers every change, including AI growth. Maps save themselves in the browser, and you can export or import an outline or a map file.
+- **Never lose anything:** undo/redo covers every change, including AI growth. Maps save themselves in the browser, and you can export or import an outline or a map file, or save the whole map as a PNG image.
 - **Works on phones:** it supports touch and two-finger pinch zoom.
 
 ### Keyboard
@@ -69,7 +69,7 @@ skill/mind-map/
   app.js, app.css   bundled copies the skill publishes
 ```
 
-For each map, the skill copies the bundled `app.js` and `app.css` into a fresh folder with one shell command and writes a tiny `index.html` whose seed block holds `{"id","q","ctx","seeds"}`. It then publishes all three as a new artifact with the `sample` capability. Claude only writes a few lines instead of the 60 KB app, so a new map takes seconds. The `id` gives each map its own saved state.
+For each map, the skill copies the bundled `app.js` and `app.css` into a fresh folder with one shell command and writes a tiny `index.html` whose seed block holds `{"id","q","ctx","seeds"}`. It then publishes all three as a new artifact with the `sample` capability (plus `downloads`, for saving the map as an image). Claude only writes a few lines instead of the 60 KB app, so a new map takes seconds. The `id` gives each map its own saved state.
 
 The page asks Claude for ideas through `await window.claude.use('sample')`. Outside claude.ai, that capability isn't available: the grow controls turn off, the top bar says "generation off", and everything else still works. You can open `app/index.html` straight from disk to try it.
 

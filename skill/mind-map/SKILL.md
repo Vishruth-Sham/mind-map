@@ -57,7 +57,7 @@ Each map is a new artifact: a ~15-line page holding the seed block, with `app.js
    - `file_path`: `<folder>/index.html`
    - `files`: `{"app.js": "<folder>/app.js", "app.css": "<folder>/app.css"}`
    - `icon`: `map`
-   - `capabilities`: `{"sample": {}}` so the page can generate ideas
+   - `capabilities`: `{"sample": {}, "downloads": true}` so the page can generate ideas and save the map as a PNG
 
 If publishing fails, tell the user why. They can still open `app/index.html` from the repo in a browser and type the question and seeds into its setup screen (idea generation is off outside claude.ai).
 
