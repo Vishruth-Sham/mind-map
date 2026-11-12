@@ -197,7 +197,7 @@ def test_incomplete_seed_block_prefills_setup(app, seed, expect_q, expect_chips)
     app.seeded(seed).open()
     assert app.page.is_visible("#setup")
     assert app.page.input_value("#q") == expect_q
-    assert app.page.locator(".chip > span").all_text_contents() == expect_chips
+    assert app.page.input_value("#seedin") == "\n".join(expect_chips)
 
 
 def test_malformed_seed_json_shows_setup(app):

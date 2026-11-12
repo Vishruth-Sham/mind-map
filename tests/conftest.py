@@ -117,9 +117,7 @@ class App:
     def build(self, q="How might we test this?", seeds=("Alpha", "Beta", "Gamma")):
         p = self.page
         p.fill("#q", q)
-        for s in seeds:
-            p.fill("#seedin", s)
-            p.press("#seedin", "Enter")
+        p.fill("#seedin", "\n".join(seeds))   # one seed per line
         p.click("#goBtn")
         try:
             p.wait_for_selector("#setup", state="hidden", timeout=5000)

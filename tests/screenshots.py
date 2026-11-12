@@ -31,9 +31,7 @@ MOCK = """(L)=>{let i=0;const s=async p=>{await new Promise(r=>setTimeout(r,30))
 
 def build(a):
     a.page.fill("#q", Q)
-    for s in SEEDS:
-        a.page.fill("#seedin", s)
-        a.page.press("#seedin", "Enter")
+    a.page.fill("#seedin", "\n".join(SEEDS))
 
 
 def main(out, extra):
@@ -51,10 +49,10 @@ def main(out, extra):
         # 1. setup screen, mid-typing
         a = App(b, tmp, **big).mock().open()
         build(a)
-        a.page.fill("#seedin", "Desk sw")
+        a.page.fill("#seedin", "\n".join(SEEDS) + "\nDesk sw")
         a.settle(300)
         a.page.screenshot(path=str(out / "1-setup.jpg"), type="jpeg", quality=82)
-        a.page.fill("#seedin", "")
+        a.page.fill("#seedin", "\n".join(SEEDS))
 
         # 2. the fresh map, a seed selected so the AI toolbar shows
         a.page.click("#goBtn")

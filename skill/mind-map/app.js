@@ -29,6 +29,12 @@ document.getElementById('seed').insertAdjacentHTML('beforebegin',String.raw`<div
 
 <div id="help"><kbd>Tab</kbd> new branch · <kbd>Enter</kbd> sibling · <kbd>G</kbd> grow · <kbd>L</kbd> or the link button, then click an idea to link/unlink · drag the corner link handle onto an idea · <kbd>⇧</kbd>+drag to select many · double-click canvas to add</div>
 <div id="lbanner" role="status"><span>Click another idea to link it. Esc to cancel</span><button id="lcancel" title="Cancel linking (Esc)" aria-label="Cancel linking"></button></div>
+<aside id="chat" hidden aria-label="Chat about this idea">
+  <header><div class="ct"><span class="lbl">Chat about</span><b id="chatT"></b></div><button id="chatX" title="Close chat (Esc)" aria-label="Close chat"></button></header>
+  <div id="chatLog" role="log" aria-live="polite"></div>
+  <div class="cin"><textarea id="chatMsg" rows="2" placeholder="Say what you're thinking about this idea…"></textarea><button id="chatSend" title="Send (Enter)" aria-label="Send"></button></div>
+  <button id="chatGrow" class="cgrow"></button>
+</aside>
 <div id="toast"></div>
 <div class="grain"></div>
 
@@ -41,8 +47,9 @@ document.getElementById('seed').insertAdjacentHTML('beforebegin',String.raw`<div
       <div class="aside"><svg viewBox="0 0 34 26"><path d="M3 2c0 9 4 15 13 17 4 1 9 0 13-1" stroke="#1B1A18" stroke-width="1.6" fill="none" stroke-linecap="round"/><path d="M24 13l6 5-7 3" stroke="#1B1A18" stroke-width="1.6" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg><span>Every new idea builds on the one it grows from. No judging until you're done generating.</span></div>
       <label class="fl" for="q">Your question</label>
       <textarea id="q" rows="1" placeholder="How might we…"></textarea>
-      <div class="seeds" id="chips"><input id="seedin" placeholder="Type a seed idea, press Enter"></div>
-      <div class="hint">Five or six seeds works well. Paste a list to add several at once.</div>
+      <label class="fl sl" for="seedin">Seed ideas</label>
+      <textarea id="seedin" rows="4" placeholder="One idea per line. Press Enter for the next one." spellcheck="true"></textarea>
+      <div class="hint">Five or six seeds works well, one per line.</div>
       <button id="ctxtog">Add context (optional)</button>
       <textarea id="sctx" placeholder="Who is this for? Constraints, inspiration, things to avoid…"></textarea>
       <button class="go" id="goBtn"><span class="bub"><svg class="i" viewBox="0 0 24 24"><path d="M5 12h14M13 6l6 6-6 6"/></svg></span>Map it</button>
@@ -78,6 +85,7 @@ const IC={
  link:'<path d="M10 14a4 4 0 0 0 5.6 0l3.2-3.2a4 4 0 0 0-5.6-5.6l-1 1"/><path d="M14 10a4 4 0 0 0-5.6 0l-3.2 3.2a4 4 0 0 0 5.6 5.6l1-1"/>',
  unlink:'<path d="M10 14a4 4 0 0 0 5.6 0l3.2-3.2a4 4 0 0 0-5.6-5.6l-1 1"/><path d="M14 10a4 4 0 0 0-5.6 0l-3.2 3.2a4 4 0 0 0 5.6 5.6l1-1"/><path d="M3 3l18 18"/>',
  merge:'<path d="M6 3v5a6 6 0 0 0 6 6 6 6 0 0 1 6 6v1M18 3v5a6 6 0 0 1-6 6"/>',
+ chat:'<path d="M4 5h16v11H9l-5 4z"/>', send:'<path d="M4 12 20 4l-6 16-3-7z"/>',
  x:'<path d="M6 6l12 12M18 6 6 18"/>', branch:'<circle cx="6" cy="6" r="2.5"/><circle cx="18" cy="18" r="2.5"/><path d="M8.5 6H12a4 4 0 0 1 4 4v5.5"/>'
 };
 const ic=(n,c='i')=>`<svg class="${c}" viewBox="0 0 24 24">${IC[n]}</svg>`;
@@ -94,6 +102,8 @@ const MODES={
 };
 let S=null, sel=new Set(), selEdge=null, undoS=[], redoS=[], V={x:0,y:0,k:1}, sample=null, growing=false, busy=new Set(), editing=null;
 let linkFrom=null;          // source node while in click-to-link mode
+// Per-idea chats live beside the map, not in it: chatting isn't an undo step and undo never loses messages.
+let CH={}, chatId=null, chatBusy=false;   // CH[nodeId] = [{r:'u'|'a', t:text}]
 const dragSet=new Set();    // nodes currently being dragged (survive re-renders)
 const AP={};                // display-only positions while a node animates in
 let epoch=0, loopId=0, loopP=null;      // epoch bumps when the whole map is replaced (new map / import)
@@ -104,7 +114,13 @@ const ek=(a,b)=>a<b?a+'|'+b:b+'|'+a;
 const reduce=matchMedia('(prefers-reduced-motion: reduce)').matches;
 
 /* ---------- persistence & history ---------- */
-function save(){try{localStorage.setItem(KEY,JSON.stringify({S,V}))}catch(e){}}
+function save(){try{localStorage.setItem(KEY,JSON.stringify({S,V,CH}))}catch(e){}}
+// Keep only well-formed chats for ideas that exist.
+function cleanChats(c,map){const o={};if(!c||typeof c!=='object'||!map)return o;
+  for(const [k,a] of Object.entries(c)){if(!map.nodes[k]||!Array.isArray(a))continue;
+    const m=a.filter(x=>x&&(x.r==='u'||x.r==='a')&&typeof x.t==='string'&&x.t.trim()).slice(-200).map(x=>({r:x.r,t:x.t.slice(0,4000)}));
+    if(m.length)o[k]=m}
+  return o}
 const clip=t=>String(t==null?'':t).replace(/\s+/g,' ').trim();
 const num=(v,d=0)=>typeof v==='number'&&isFinite(v)?v:d;
 const IDRE=/^[A-Za-z0-9_-]{1,40}$/;
@@ -126,7 +142,7 @@ function clean(v){
   return {q:nodes.root.text,ctx:typeof v.ctx==='string'?v.ctx:'',seq,nodes,edges:[...seen]};
 }
 function load(){try{const r=JSON.parse(localStorage.getItem(KEY)||'null'),c=r&&clean(r.S);
-  if(c){S=c;const v=r.V;if(v&&[v.x,v.y,v.k].every(Number.isFinite)&&v.k>0)V={x:v.x,y:v.y,k:Math.min(2.5,Math.max(.15,v.k))}}}catch(e){}}
+  if(c){S=c;CH=cleanChats(r.CH,c);const v=r.V;if(v&&[v.x,v.y,v.k].every(Number.isFinite)&&v.k>0)V={x:v.x,y:v.y,k:Math.min(2.5,Math.max(.15,v.k))}}}catch(e){}}
 const snap=()=>JSON.stringify(S);
 function commit(pre){undoS.push(pre||snap());if(undoS.length>120)undoS.shift();redoS=[]}
 function restore(str){S=JSON.parse(str);[...sel].forEach(i=>{if(!S.nodes[i])sel.delete(i)});if(selEdge&&!S.edges.includes(selEdge))selEdge=null;if(linkFrom&&!S.nodes[linkFrom])endLink();save();render()}
@@ -180,6 +196,7 @@ function render(){
   if(editing){dirty=true;return}   // rebuilt when the edit finishes (see startEdit)
   dirty=false;
   if(linkFrom&&!S.nodes[linkFrom])endLink();
+  if(chatId&&!S.nodes[chatId])closeChat(true);else if(chatId)$('chatT').textContent=N(chatId).text;
   const layer=$('nodes');layer.innerHTML='';for(const k in els)delete els[k];
   Object.values(S.nodes).forEach(n=>{
     const el=document.createElement('div');el.dataset.id=n.id;
@@ -188,6 +205,8 @@ function render(){
     const p=P(n.id);el.style.left=p.x+'px';el.style.top=p.y+'px';
     const tx=document.createElement('div');tx.className='tx';tx.textContent=n.text;el.appendChild(tx);
     if(n.star)el.insertAdjacentHTML('beforeend',`<span class="stk">${ic('star')}</span>`);
+    if(CH[n.id]&&CH[n.id].length)el.insertAdjacentHTML('beforeend',`<span class="cbdg" title="Has a chat">${ic('chat')}</span>`);
+    if(chatId===n.id)el.classList.add('chatting');
     const hd=document.createElement('span');hd.className='hd';hd.title='Drag onto another idea to link — drop on empty space to add a connected idea';hd.innerHTML=ic('link');el.appendChild(hd);
     el.addEventListener('pointerdown',e=>nodeDown(e,n.id));
     el.addEventListener('dblclick',e=>{e.stopPropagation();startEdit(n.id)});
@@ -390,17 +409,20 @@ function aiError(e,what){
   else if(e&&e.code==='stale'){}
   else toast(what+': '+(e&&e.message||'unknown error'));
 }
-const head=()=>`You are a brainstorming partner in the GENERATION stage of design thinking. Rules: defer judgment (no feasibility talk, no criticism), go for quantity, welcome wild ideas, build on others' ideas ("Yes, and…").
+const head=()=>`You are a brainstorming partner in the GENERATION stage of design thinking. Rules: defer judgment (no feasibility talk, no criticism), go for quantity, build on others' ideas ("Yes, and…").
 Question at the centre of the map: ${S.q}
 ${S.ctx?'Context: '+S.ctx+'\n':''}`;
-async function grow(id,mode='yes',n=4,limit=Infinity){
+// `talk` (optional) is the transcript of this idea's chat: grow from what the user said there.
+async function grow(id,mode='yes',n=4,limit=Infinity,talk=null){
   if(!sample){toast('Idea generation is off in this view. You can still add ideas by hand.');throw{code:'none'}}
   if(!S.nodes[id]||busy.has(id))return;
   const node=N(id),{prev}=bfs(),ep=epoch;
-  // New ideas depend only on the ideas along the path from the question to this one.
+  // New ideas depend only on the ideas along the path from the question to this one (plus its chat).
+  const task=talk?`Build on this idea, steered by what the user said in this conversation about it:
+${talk}`:id==='root'?'Generate fresh, distinct directions that answer the question.':MODES[mode].ins;
   const prompt=head()+`Path from the question to this idea: ${pathTo(id,prev).join(' → ')}
 Idea to grow from: "${node.text}"
-Task: ${id==='root'?'Generate fresh, distinct directions that answer the question.':MODES[mode].ins}
+Task: ${task}
 Generate ${n} new ideas. Each one a vivid, specific phrase of 14 words or fewer. No numbering, no explanations.
 Return only a JSON array of strings.`;
   busy.add(id);render();
@@ -480,7 +502,7 @@ function placeCtx(){
   let html='';
   if(ids.length===1){const id=ids[0],n=N(id);
     html=Object.entries(MODES).map(([k,m])=>`<button class="gen" data-g="${k}" ${!sample||busy.has(id)?'disabled':''}>${k==='yes'?ic('branch'):''}${m.label}</button>`).join('')+
-      `<span class="vr"></span><button data-a="child" title="Add your own (Tab)">${ic('plus')}</button><button data-a="linkmode" class="${linkFrom===id?'on':''}" title="Link to another idea (L)">${ic('link')}${linkFrom===id?'Cancel':'Link'}</button><button data-a="edit" title="Edit (F2)">${ic('edit')}</button>`+
+      `<span class="vr"></span><button data-a="chat" class="${chatId===id?'on':''}" title="Chat about this idea (C)">${ic('chat')}Chat</button><button data-a="child" title="Add your own (Tab)">${ic('plus')}</button><button data-a="linkmode" class="${linkFrom===id?'on':''}" title="Link to another idea (L)">${ic('link')}${linkFrom===id?'Cancel':'Link'}</button><button data-a="edit" title="Edit (F2)">${ic('edit')}</button>`+
       (id!=='root'?`<button data-a="star" title="Star — growing focuses here (S)">${ic('star')}${n.star?'Unstar':''}</button><button data-a="del" title="Delete">${ic('trash')}</button>`:'');
   }else{
     const pair=ids.length===2,linked=pair&&hasEdge(ids[0],ids[1]);
@@ -509,6 +531,7 @@ $('ctx').addEventListener('click',e=>{
   if(a==='child')addChild(id);
   else if(a==='edit')startEdit(id);
   else if(a==='linkmode')beginLink(id);
+  else if(a==='chat')chatId===id?closeChat():openChat(id);
   else if(a==='star'){commit();N(id).star=!N(id).star;save();render()}
   else if(a==='del')delSel();
   else if(a==='combine')combine();
@@ -527,20 +550,61 @@ $('fit').onclick=()=>fit();$('tidy').onclick=tidy;
 $('add').onclick=()=>{const o=sel.size===1?[...sel][0]:null;if(o)return addChild(o);const p=toWorld(innerWidth/2,innerHeight/2);commit();const id=mkNode('New idea',p.x+(Math.random()*80-40),p.y+(Math.random()*80-40));sel.clear();sel.add(id);save();render();relax([id]);render();startEdit(id)};
 $('grow').onclick=()=>{if(growing)return stopGrowing();if(!sample)return;growing=true;ui();growLoop()};
 
+/* chat about one idea */
+const transcript=id=>(CH[id]||[]).map(m=>(m.r==='u'?'User: ':'You: ')+m.t).join('\n');
+function drawChat(){
+  if(!chatId)return;const log=$('chatLog'),msgs=CH[chatId]||[];log.innerHTML='';
+  if(!msgs.length){const p=document.createElement('p');p.className='cempty';
+    p.textContent=sample?'Say what this idea makes you think of. When you like where it\'s going, grow new ideas from the chat.':'Chat needs idea generation, which is only on inside claude.ai.';log.appendChild(p)}
+  msgs.forEach(m=>{const d=document.createElement('div');d.className='msg '+(m.r==='u'?'me':'ai');d.textContent=m.t;log.appendChild(d)});
+  if(chatBusy===chatId){const d=document.createElement('div');d.className='msg ai typing';d.innerHTML='<i></i><i></i><i></i>';log.appendChild(d)}
+  log.scrollTop=log.scrollHeight;
+  $('chatSend').disabled=!sample||chatBusy===chatId;
+  $('chatGrow').disabled=!sample||!msgs.some(m=>m.r==='u')||busy.has(chatId);
+}
+function openChat(id){if(!S||!S.nodes[id])return;if(linkFrom)endLink();chatId=id;$('chat').hidden=false;$('chatT').textContent=N(id).text;
+  sel.clear();sel.add(id);selEdge=null;render();drawChat();$('chatMsg').focus()}
+function closeChat(quiet){if(!chatId&&$('chat').hidden)return;chatId=null;$('chat').hidden=true;if(S&&!quiet)render()}
+async function sendChat(){
+  const id=chatId,box=$('chatMsg'),t=box.value.trim();if(!id||!t||chatBusy)return;
+  if(!sample)return toast('Chat needs idea generation, which is only on inside claude.ai.');
+  const first=!(CH[id]&&CH[id].length);(CH[id]=CH[id]||[]).push({r:'u',t});box.value='';autoH(box);chatBusy=id;save();if(first)render();drawChat();
+  const {prev}=bfs(),ep=epoch;
+  const prompt=head()+`Path from the question to this idea: ${pathTo(id,prev).join(' → ')}
+Idea we're talking about: "${N(id).text}"
+You're chatting with the user about this one idea. Build on what they say and add a fresh angle; never criticise. Reply in 2–4 short sentences of plain text (no lists, no JSON). End with at most one question.
+Conversation so far:
+${transcript(id)}
+You:`;
+  try{const r=await sample(prompt);const txt=String(typeof r==='string'?r:(r&&r.text)||'').trim();
+    if(ep!==epoch||!S.nodes[id]||!CH[id])return;   // map replaced or idea deleted meanwhile
+    if(!txt)throw new Error('the reply was empty');
+    CH[id].push({r:'a',t:txt});save()}
+  catch(e){aiError(e,'Could not reply')}
+  finally{chatBusy=null;if(chatId===id)drawChat()}
+}
+function growFromChat(){const id=chatId;if(!id||!sample)return;
+  grow(id,'yes',4,Infinity,transcript(id)).catch(()=>{}).finally(()=>{if(chatId===id)drawChat()});drawChat()}
+$('chatX').innerHTML=ic('x');$('chatSend').innerHTML=ic('send');$('chatGrow').innerHTML=ic('branch')+'Grow from this chat';
+$('chatX').onclick=()=>closeChat();$('chatSend').onclick=sendChat;$('chatGrow').onclick=growFromChat;
+$('chatMsg').addEventListener('input',e=>autoH(e.target));
+$('chatMsg').addEventListener('keydown',e=>{if(e.key==='Enter'&&!e.shiftKey&&!e.isComposing){e.preventDefault();sendChat()}
+  else if(e.key==='Escape'){e.preventDefault();e.stopPropagation();closeChat()}});
+
 /* export */
 let exMode='out';
 function outline(){const {prev,dist}=bfs(),kids={};Object.keys(S.nodes).forEach(i=>{if(prev[i])(kids[prev[i]]=kids[prev[i]]||[]).push(i)});
   let o='';(function w(id,d){o+=(d?'  '.repeat(d-1)+'- ':'# ')+N(id).text+(N(id).star?' ★':'')+'\n';(kids[id]||[]).forEach(c=>w(c,d+1))})('root',0);
   const loose=Object.keys(S.nodes).filter(i=>dist[i]==null);if(loose.length){o+='\nUnlinked ideas\n';loose.forEach(i=>o+='- '+N(i).text+'\n')}return o}
-function showEx(){$('extext').value=exMode==='out'?outline():JSON.stringify({q:S.q,ctx:S.ctx,seq:S.seq,edges:S.edges,nodes:Object.fromEntries(Object.entries(S.nodes).map(([k,n])=>[k,{id:n.id,text:n.text,x:Math.round(n.x),y:Math.round(n.y),c:n.c,ai:n.ai,seed:n.seed,star:n.star,r:n.r}]))});
+function showEx(){$('extext').value=exMode==='out'?outline():JSON.stringify({q:S.q,ctx:S.ctx,seq:S.seq,edges:S.edges,nodes:Object.fromEntries(Object.entries(S.nodes).map(([k,n])=>[k,{id:n.id,text:n.text,x:Math.round(n.x),y:Math.round(n.y),c:n.c,ai:n.ai,seed:n.seed,star:n.star,r:n.r}])),chats:CH});
   $('tOut').classList.toggle('on',exMode==='out');$('tJson').classList.toggle('on',exMode==='json')}
 $('export').onclick=()=>{exMode='out';showEx();$('exp').hidden=false};
 $('tOut').onclick=()=>{exMode='out';showEx()};$('tJson').onclick=()=>{exMode='json';showEx()};
 $('exClose').onclick=()=>$('exp').hidden=true;
 $('exCopy').onclick=async()=>{try{await navigator.clipboard.writeText($('extext').value);toast('Copied')}catch(e){$('extext').select();toast('Copying was blocked. The text is selected, so press Ctrl+C.')}};
-$('exImp').onclick=()=>{let v=null;try{v=clean(JSON.parse($('extext').value))}catch(e){}
+$('exImp').onclick=()=>{let v=null,raw=null;try{raw=JSON.parse($('extext').value);v=clean(raw)}catch(e){}
   if(!v)return toast('That isn\'t a map file. Paste one exported from here, then choose Import.');
-  stopGrowing();epoch++;busy.clear();endLink();commit();S=v;sel.clear();selEdge=null;save();render();fit();$('exp').hidden=true;toast('Imported')};
+  stopGrowing();epoch++;busy.clear();endLink();closeChat(true);commit();S=v;CH=cleanChats(raw.chats,v);sel.clear();selEdge=null;save();render();fit();$('exp').hidden=true;toast('Imported')};
 
 /* keyboard */
 document.addEventListener('keydown',e=>{
@@ -560,23 +624,18 @@ document.addEventListener('keydown',e=>{
   else if(k==='F2'||lk==='e'){e.preventDefault();startEdit(o)}
   else if(lk==='g'){grow(o,'yes',4).catch(()=>{})}
   else if(lk==='l'){e.preventDefault();beginLink(o)}
+  else if(lk==='c'){e.preventDefault();openChat(o)}
   else if(lk==='s'&&o!=='root'){commit();N(o).star=!N(o).star;save();render()}
 });
 addEventListener('resize',()=>placeCtx());
 
 /* ---------- setup ---------- */
-let seeds=[];
-function drawChips(){
-  const box=$('chips');box.querySelectorAll('.chip').forEach(c=>c.remove());
-  seeds.forEach((s,i)=>{const c=document.createElement('span');c.className='chip';c.style.setProperty('--c',COLORS[i%COLORS.length]);c.style.setProperty('--r',((i*37%5)-2)*.6+'deg');
-    c.innerHTML=`<span></span><button title="Remove" aria-label="Remove">${ic('x')}</button>`;c.firstChild.textContent=s;
-    c.querySelector('button').onclick=()=>{seeds.splice(i,1);drawChips()};box.insertBefore(c,$('seedin'))});
-}
-function addSeeds(txt){txt.split(/\n|;/).map(unlist).filter(Boolean).forEach(s=>seeds.push(s));drawChips()}
-$('seedin').addEventListener('keydown',e=>{if(e.key==='Enter'){e.preventDefault();if(e.target.value.trim()){addSeeds(e.target.value);e.target.value=''}}else if(e.key==='Backspace'&&!e.target.value&&seeds.length){seeds.pop();drawChips()}});
-$('seedin').addEventListener('paste',e=>{const t=(e.clipboardData||window.clipboardData).getData('text');if(/\n/.test(t)){e.preventDefault();addSeeds(e.target.value+'\n'+t);e.target.value=''}});
-const growQ=()=>{const q=$('q');q.style.height='auto';q.style.height=q.scrollHeight+'px'};
-$('q').addEventListener('input',growQ);$('q').addEventListener('keydown',e=>{if(e.key==='Enter'&&!e.isComposing){e.preventDefault();$('seedin').focus()}});
+// Seeds are plain text, one per line (a pasted "a; b" line also splits; list markers are stripped).
+const seedLines=()=>$('seedin').value.split(/\n|;/).map(unlist).filter(Boolean);
+const autoH=el=>{el.style.height='auto';el.style.height=el.scrollHeight+'px'};
+const growQ=()=>{autoH($('q'));autoH($('seedin'))};
+$('q').addEventListener('input',growQ);$('seedin').addEventListener('input',growQ);
+$('q').addEventListener('keydown',e=>{if(e.key==='Enter'&&!e.isComposing){e.preventDefault();const s=$('seedin');s.focus();s.setSelectionRange(s.value.length,s.value.length)}});
 $('ctxtog').onclick=()=>{const t=$('sctx');t.style.display=t.style.display==='block'?'none':'block';if(t.style.display==='block')t.focus()};
 function seedList(){return SEED&&Array.isArray(SEED.seeds)?SEED.seeds.filter(x=>typeof x==='string'||typeof x==='number').map(unlist).filter(Boolean):[]}
 function openSetup(){
@@ -584,23 +643,22 @@ function openSetup(){
   // With no map yet, prefill from a seed block that couldn't boot (e.g. a question but no seeds).
   const pre=S||(SEED&&typeof SEED==='object'?{q:clip(SEED.q),ctx:clip(SEED.ctx)}:null);
   $('q').value=pre?pre.q||'':'';$('sctx').value=pre?pre.ctx||'':'';$('sctx').style.display=pre&&pre.ctx?'block':'none';
-  seeds=S?[]:seedList();drawChips();$('serr').textContent='';
+  $('seedin').value=S?'':seedList().join('\n');$('serr').textContent='';
   $('below').innerHTML=S?`<button id="backBtn">Back to your map</button><span class="hint">Mapping again starts a fresh map. Use Undo on the map to get the old one back.</span>`:'';
   if(S)$('backBtn').onclick=()=>{$('setup').hidden=true};
   $('setup').hidden=false;requestAnimationFrame(()=>{growQ();if(!$('setup').contains(document.activeElement))$('q').focus()});
 }
 $('home').onclick=openSetup;
 $('goBtn').onclick=()=>{
-  const pending=$('seedin').value.trim();if(pending){addSeeds(pending);$('seedin').value=''}
-  const q=$('q').value.trim();
+  const q=$('q').value.trim(),seeds=seedLines();
   if(!q){$('serr').textContent='Write the question you want to explore.';$('q').focus();return}
   if(!seeds.length){$('serr').textContent='Add at least one seed idea to start a branch.';$('seedin').focus();return}
   buildMap(q,$('sctx').value.trim(),seeds);
 };
 function buildMap(q,ctx,seeds){
   const pre=S?snap():null;
-  stopGrowing();epoch++;busy.clear();endLink();Object.keys(AP).forEach(k=>delete AP[k]);
-  S={q,ctx,seq:0,nodes:{},edges:[]};
+  stopGrowing();epoch++;busy.clear();endLink();closeChat(true);Object.keys(AP).forEach(k=>delete AP[k]);
+  S={q,ctx,seq:0,nodes:{},edges:[]};CH={};
   S.nodes.root={id:'root',text:q,x:0,y:0,c:null,ai:false,seed:false,star:false,r:0};
   const ids=seeds.map((s,i)=>{const id=mkNode(s,0,0,{c:i,seed:true});link('root',id);return id});
   const tall=innerHeight>innerWidth*1.2,rx=tall?190:300,ry=tall?340:230;   // portrait phones: lay seeds out tall, not wide

@@ -37,6 +37,7 @@ If you give fewer than 3 seeds, Claude tops up to 6 and marks which ones it adde
 
 - **Grow with Claude:** select an idea and pick **Yes, and**, **Wilder**, **Concrete** or **Flip it**. Select several ideas and **Combine** them into hybrids.
 - **Keep growing:** one button keeps expanding the map, breadth-first. It focuses on your selection, then on starred ideas, then on everything, and stops at 220 ideas.
+- **Chat with any idea:** press **Chat** (or `C`) on an idea to talk it through with Claude in a side panel. Then press **Grow from this chat** to add new ideas shaped by what you said. Each idea keeps its own chat.
 - **Link anything:** press `L` (or **Link**) and click another idea. Drag the corner handle onto an idea, or onto empty space to spawn a new one. Click a line to unlink it.
 - **Arrange it:** drag, shift-drag to select many, pan, pinch or ⌘-scroll to zoom, and **Tidy** for an automatic layout.
 - **Never lose anything:** undo/redo covers every change, including AI growth. Maps save themselves in the browser, and you can export or import an outline or a map file.
@@ -50,6 +51,7 @@ If you give fewer than 3 seeds, Claude tops up to 6 and marks which ones it adde
 | `F2`, `E`, double-click | edit (`Enter` saves, `Esc` cancels) |
 | `G` | grow the selected idea |
 | `L` | link mode |
+| `C` | chat about the selected idea |
 | `S` | star / unstar |
 | `Delete` | delete the selection or the selected link |
 | `⌘Z` / `⌘⇧Z` | undo / redo |

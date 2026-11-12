@@ -1,4 +1,4 @@
-"""Setup screen: validation, seed chips, building the map."""
+"""Setup screen: validation, the one-seed-per-line box, building the map."""
 
 
 def test_empty_question_and_no_seeds_are_rejected(app):
@@ -31,31 +31,43 @@ def test_enter_in_question_moves_to_seed_input(app):
     assert app.page.input_value("#q") == "Q?"
 
 
-def test_paste_multiline_seeds_and_list_markers(app):
+def test_seed_box_one_idea_per_line(app):
     app.open()
     p = app.page
-    p.focus("#seedin")
-    p.evaluate("""() => { const dt = new DataTransfer();
-        dt.setData('text/plain', '- Alpha\\n2. Beta\\n* Gamma\\n\\n3D-printed lamp\\n24-hour cafe; Delta');
-        document.getElementById('seedin').dispatchEvent(new ClipboardEvent('paste', {clipboardData: dt, bubbles: true, cancelable: true})); }""")
-    chips = p.locator(".chip > span").all_text_contents()
-    assert chips == ["Alpha", "Beta", "Gamma", "3D-printed lamp", "24-hour cafe", "Delta"]
+    p.fill("#q", "Q?")
+    p.click("#seedin")
+    p.keyboard.type("Alpha")
+    p.keyboard.press("Enter")          # Enter starts a new line, it doesn't submit
+    p.keyboard.type("Beta")
+    p.keyboard.press("Enter")
+    p.keyboard.press("Enter")          # blank lines are ignored
+    p.keyboard.type("Gamma")
+    assert p.input_value("#seedin") == "Alpha\nBeta\n\nGamma"
+    assert p.is_visible("#setup")
+    p.click("#goBtn")
+    p.wait_for_selector("#setup", state="hidden")
+    seeds = sorted(n["text"] for k, n in app.nodes().items() if k != "root")
+    assert seeds == ["Alpha", "Beta", "Gamma"]
 
 
-def test_backspace_removes_last_chip_and_x_removes_specific(app):
+def test_pasted_list_markers_and_semicolons_are_split(app):
     app.open()
     p = app.page
-    for s in ["One", "Two", "Three"]:
-        p.fill("#seedin", s)
-        p.press("#seedin", "Enter")
-    p.press("#seedin", "Backspace")
-    assert p.locator(".chip > span").all_text_contents() == ["One", "Two"]
-    p.locator(".chip").first.locator("button").click()
-    assert p.locator(".chip > span").all_text_contents() == ["Two"]
-    # Backspace with text in the box edits the text, not the chips
-    p.fill("#seedin", "abc")
-    p.press("#seedin", "Backspace")
-    assert p.locator(".chip").count() == 1
+    p.fill("#q", "Q?")
+    p.fill("#seedin", "- Alpha\n2. Beta\n* Gamma\n\n3D-printed lamp\n24-hour cafe; Delta")
+    p.click("#goBtn")
+    p.wait_for_selector("#setup", state="hidden")
+    seeds = sorted(n["text"] for k, n in app.nodes().items() if k != "root")
+    assert seeds == sorted(["Alpha", "Beta", "Gamma", "3D-printed lamp", "24-hour cafe", "Delta"])
+
+
+def test_seed_box_grows_with_its_lines(app):
+    app.open()
+    p = app.page
+    h0 = p.locator("#seedin").bounding_box()["height"]
+    p.fill("#seedin", "\n".join(f"Seed {i}" for i in range(10)))
+    p.dispatch_event("#seedin", "input")
+    assert p.locator("#seedin").bounding_box()["height"] > h0 * 2
 
 
 def test_pending_seed_text_is_added_on_map_it(app):
