@@ -19,11 +19,11 @@ Read them from the args or message. Typical forms: `/mind-map How might we X? | 
 - **Context:** optional. Include it only if the user gives some, such as who it's for or constraints.
 
 Design-thinking rules for any ideas you write:
-- defer judgment, with no feasibility talk
+- defer judgment: don't criticise or rank ideas
 - go for quantity
-- welcome wild ideas
+- welcome bold ideas, but keep each one a real, doable answer within the question's constraints (who, where, when, how long)
 - build on ideas ("Yes, and…")
-- keep each idea a short, vivid phrase
+- keep each idea a short, specific, plain phrase
 
 ## 2. Publish a small page plus the bundled app files
 

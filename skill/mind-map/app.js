@@ -96,10 +96,10 @@ const COLORS=['#FF7AB6','#FFD43B','#58C98F','#6FA2F5','#FF9150','#A88BF5','#3FCB
 let SEED=null;try{const t=document.getElementById('seed').textContent.trim();if(t)SEED=JSON.parse(t);if(!SEED||typeof SEED!=='object'||Array.isArray(SEED))SEED=null}catch(e){SEED=null}
 const KEY='mindmapper-v2'+(SEED&&SEED.id?':'+SEED.id:'');
 const MODES={
-  yes:{label:'Yes, and',ins:'Build on this idea ("Yes, and…"): extend it, specialise it, or take it one step further.'},
-  wild:{label:'Wilder',ins:'Push it wild: bold, unexpected, even slightly absurd twists that could spark something new.'},
+  yes:{label:'Yes, and',ins:'Build on this idea ("Yes, and…"): a more specific version, a natural next step, or a good add-on, staying within what the question allows.'},
+  wild:{label:'Wilder',ins:'Push it wild: bold, unexpected twists that could spark something new, yet still possible in real life and within the question\'s constraints.'},
   real:{label:'Concrete',ins:'Make it concrete: specific versions, first experiments, or real-world shapes this could take next week.'},
-  flip:{label:'Flip it',ins:'Flip it: invert an assumption, change who/where/when/how, or come at it from the opposite angle.'}
+  flip:{label:'Flip it',ins:'Flip it: invert one assumption about how this idea is done (its order, pace, setting or approach), while keeping the question\'s own constraints.'}
 };
 let S=null, sel=new Set(), selEdge=null, undoS=[], redoS=[], V={x:0,y:0,k:1}, sample=null, growing=false, busy=new Set(), editing=null;
 let linkFrom=null;          // source node while in click-to-link mode
@@ -412,7 +412,9 @@ function aiError(e,what){
   else if(e&&e.code==='stale'){}
   else toast(what+': '+(e&&e.message||'unknown error'));
 }
-const head=()=>`You are a brainstorming partner in the GENERATION stage of design thinking. Rules: defer judgment (no feasibility talk, no criticism), go for quantity, build on others' ideas ("Yes, and…").
+// Generation stage, but grounded: ideas stay real answers to the question, so deep branches don't drift into fantasy.
+const head=()=>`You are a brainstorming partner in the GENERATION stage of design thinking: go for quantity, build on ideas ("Yes, and…"), and don't criticise or rank them.
+Keep every idea grounded: it must still be a real, doable answer to the question at the centre. Respect the question's constraints (who, where, when, how long, budget) and any context. Use real places, things, people and activities, not fantasy or stunts. Say it plainly, the way a friend who knows the subject would.
 Question at the centre of the map: ${S.q}
 ${S.ctx?'Context: '+S.ctx+'\n':''}`;
 // `talk` (optional) is the transcript of this idea's chat: grow from what the user said there.
@@ -426,7 +428,7 @@ ${talk}`:id==='root'?'Generate fresh, distinct directions that answer the questi
   const prompt=head()+`Path from the question to this idea: ${pathTo(id,prev).join(' → ')}
 Idea to grow from: "${node.text}"
 Task: ${task}
-Generate ${n} new ideas. Each one a vivid, specific phrase of 14 words or fewer. No numbering, no explanations.
+Generate ${n} new ideas. Each one a specific, plain phrase of 14 words or fewer. No numbering, no explanations.
 Return only a JSON array of strings.`;
   busy.add(id);render();
   try{
@@ -450,7 +452,7 @@ async function combine(){
   ids.forEach(i=>link(i,hub));sel.clear();sel.add(hub);render();relax([hub]);render();save();
   const prompt=head()+`Combine these ideas into hybrids, merging the most interesting part of each:
 ${ids.map(i=>'- '+N(i).text).join('\n')}
-Generate 4 hybrid ideas, each a vivid, specific phrase of 16 words or fewer.
+Generate 4 hybrid ideas, each a specific, plain phrase of 16 words or fewer.
 Return only a JSON array of strings.`;
   busy.add(hub);render();
   try{const ideas=(await ask(prompt)).slice(0,5);
