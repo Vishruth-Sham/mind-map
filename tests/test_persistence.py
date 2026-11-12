@@ -191,6 +191,7 @@ def test_seed_block_fully_unicode_escaped(app):
     ({"id": "s1", "q": "Only a question", "seeds": []}, "Only a question", []),
     ({"id": "s2", "q": "Q", "seeds": ["", "  ", None, {"x": 1}]}, "Q", []),
     ({"id": "s3", "seeds": ["Orphan seed"]}, "", ["Orphan seed"]),
+    ({"id": "blank1"}, "", []),   # a bare /mind-map: blank map on the setup screen
 ])
 def test_incomplete_seed_block_prefills_setup(app, seed, expect_q, expect_chips):
     app.seeded(seed).open()

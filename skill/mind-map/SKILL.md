@@ -13,8 +13,9 @@ The app's code ships with this skill: `app.js` and `app.css` sit next to this fi
 
 Read them from the args or message. Typical forms: `/mind-map How might we X? | seed 1; seed 2; seed 3`, or a question followed by a list.
 
-- **Question:** if there isn't one, ask a single short question for it. Otherwise phrase it as a "How might we…?" need, keeping the user's wording where you can.
-- **Seeds:** use the user's own seeds as given. If they give fewer than 3, top up to 6 yourself, following the design-thinking rules below. Mark which seeds are yours when you reply.
+- **No question (a bare `/mind-map`):** don't ask for one. Go straight to step 2 and publish a blank map, which opens on the page's own setup screen where the user types the question and seeds. Write no seeds yourself.
+- **Question:** phrase it as a "How might we…?" need, keeping the user's wording where you can.
+- **Seeds:** use the user's own seeds as given. If they give a question with fewer than 3 seeds, top up to 6 yourself, following the design-thinking rules below. Mark which seeds are yours when you reply.
 - **Context:** optional. Include it only if the user gives some, such as who it's for or constraints.
 
 Design-thinking rules for any ideas you write:
@@ -51,6 +52,7 @@ Each map is a new artifact: a ~15-line page holding the seed block, with `app.js
 
    - `QUESTION_SHORT`: the question cut to about 6 words, HTML-escaped (`&` → `&amp;`, `<` → `&lt;`).
    - `SEED_JSON`: `{"id":"<random 8 chars>","q":"<question>","ctx":"<context or empty>","seeds":["…","…"]}` as valid JSON. Then replace every `<` with `\u003c` so the script tag can't close early. Seeds must be non-empty strings. If the block has a question but no usable seeds, the page opens its setup screen prefilled instead.
+   - **Blank map:** `SEED_JSON` is just `{"id":"<random 8 chars>"}` and the title is `Mind map`. The page opens on its setup screen.
 3. Publish it as a **new** artifact (no `url`) with the Artifact tool:
    - `file_path`: `<folder>/index.html`
    - `files`: `{"app.js": "<folder>/app.js", "app.css": "<folder>/app.css"}`
@@ -64,5 +66,7 @@ If publishing fails, tell the user why. They can still open `app/index.html` fro
 Keep it to one or two lines and don't repeat the link, because the artifact card already shows it. Say:
 - the question and the seed count, marking any seeds you added
 - the next move: select a node and pick Yes, and / Wilder / Concrete / Flip it, or hit **Keep growing**, then star the branches they want it to focus on
+
+For a blank map, say only that it opens on the setup screen: type the question, add seeds, and press **Map it**.
 
 Stay in generation mode. Don't evaluate or rank ideas unless the user asks to move to evaluation.
