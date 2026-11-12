@@ -49,9 +49,33 @@ MOCK_JS = r"""
     else v = ideas();
     return asJson ? v : {text: 'Here you go:\n' + JSON.stringify(v)};
   }
-  const sample = p => answer(p, false);
+  // Chat with page tools: run the first tool once, like Claude deciding to search.
+  async function withTools(p, opts) {
+    if (opts && opts.tools) {
+      window.__toolOut = await opts.tools[0].execute({objective: 'find examples', queries: ['monday office ideas']}, {signal: new AbortController().signal});
+      window.__calls.push({prompt: p, asJson: false, tools: opts.tools.map(t => t.name)});
+      return {text: 'Teams like rotating perks.'};
+    }
+    return answer(p, false);
+  }
+  const sample = (p, o) => withTools(p, o);
   sample.json = p => answer(p, true);
+  sample.limits = async () => window.__mock.tools ? {maxPromptBytes: 262144, tools: {maxCount: 8}} : {maxPromptBytes: 262144};
+  //   window.__mock.web   : expose a Parallel Search connector through use('mcp')
+  //   window.__mock.webErr: make its web_search reject with that code
+  window.__mcpCalls = [];
+  const mcp = {
+    listTools: async () => ({servers: [{server: 'Parallel Search', authStatus: 'connected', tools: [{name: 'web_search', description: ''}]}]}),
+    callTool: async (server, tool, input) => {
+      window.__mcpCalls.push({server, tool, input});
+      if (window.__mock.webErr) throw {code: window.__mock.webErr, message: 'x'};
+      return {content: [], payload: {results: [
+        {url: 'https://example.com/a', title: 'Fun Mondays', excerpts: ['Spin a wheel of perks.']},
+        {url: 'javascript:alert(1)', title: 'Bad link', excerpts: ['nope']},
+        {url: 'https://example.org/b', title: 'Huddle ideas', excerpts: ['Office playlist.', 'Breakfast bar.']}]}};
+    }};
   window.claude = {use: async name => {
+    if (name === 'mcp') return window.__mock.web ? mcp : null;
     if (name !== 'sample') return null;
     if (!window.__mock.json) { const s = p => answer(p, false); return s; }
     return sample;

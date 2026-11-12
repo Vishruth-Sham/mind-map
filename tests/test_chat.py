@@ -137,3 +137,70 @@ def test_chat_panel_fits_on_a_phone(make_app):
     app.ev("(id)=>openChat(id)", app.id_of("Alpha"))
     b = app.page.locator("#chat").bounding_box()
     assert b["x"] >= 0 and b["x"] + b["width"] <= 390 and b["y"] + b["height"] <= 844
+
+
+# ---------- web search through the Parallel Search connector ----------
+
+def web_chat(make_app, **mock):
+    app = chat_map(make_app, web=True, **mock)
+    open_chat(app, app.id_of("Alpha"))
+    return app
+
+
+def test_search_toggle_hidden_without_connector(make_app):
+    app = chat_map(make_app)
+    open_chat(app, app.id_of("Alpha"))
+    assert app.page.is_hidden("#chatWebRow")
+
+
+def test_search_off_by_default_and_never_calls_connector(make_app):
+    app = web_chat(make_app, tools=True)
+    assert app.page.is_visible("#chatWebRow") and not app.page.is_checked("#chatWeb")
+    send(app, "hello")
+    assert app.ev("window.__mcpCalls.length") == 0
+    assert app.page.locator("#chatLog .srcs").count() == 0
+
+
+def test_search_with_tools_lists_sources(make_app):
+    app = web_chat(make_app, tools=True)
+    app.page.click("#chatWebRow")
+    send(app, "What do real offices do?")
+    call = app.ev("window.__mcpCalls[0]")
+    assert call["server"] == "Parallel Search" and call["tool"] == "web_search"
+    assert call["input"]["search_queries"] == ["monday office ideas"] and len(call["input"]["session_id"]) == 32
+    assert app.ev("window.__calls[window.__calls.length-1].tools") == ["web_search"]
+    out = app.ev("window.__toolOut")
+    assert [r["url"] for r in out] == ["https://example.com/a", "https://example.org/b"]   # unsafe link dropped
+    links = app.page.locator("#chatLog .srcs a")
+    assert links.all_text_contents() == ["Fun Mondays", "Huddle ideas"]
+    assert links.first.get_attribute("target") == "_blank"
+    a = app.id_of("Alpha")
+    assert app.ev("CH")[a][1]["src"][0] == {"t": "Fun Mondays", "u": "https://example.com/a"}
+    # the toggle is remembered, and sources survive a reload
+    app.page.reload()
+    app.settle(300)
+    app.ev("(id)=>openChat(id)", a)
+    app.settle(100)
+    assert app.page.is_checked("#chatWeb")
+    assert app.page.locator("#chatLog .srcs a").count() == 2
+    assert not app.errors, app.errors
+
+
+def test_search_without_tools_searches_first(make_app):
+    app = web_chat(make_app)
+    app.page.click("#chatWebRow")
+    send(app, "coffee carts in offices")
+    q = app.ev("window.__mcpCalls[0].input.search_queries")
+    assert q == ["Alpha", "coffee carts in offices"]
+    prompt = app.ev("window.__calls[window.__calls.length-1].prompt")
+    assert "Spin a wheel of perks." in prompt and "example.com/a" in prompt
+    assert app.page.locator("#chatLog .srcs a").count() == 2
+
+
+def test_missing_connector_turns_search_off(make_app):
+    app = web_chat(make_app, webErr="server_not_connected")
+    app.page.click("#chatWebRow")
+    send(app, "hi")
+    assert "Add it in claude.ai Settings" in app.toast()
+    assert len(msgs(app)) == 2                     # still answered, just without search
+    assert app.page.is_hidden("#chatWebRow")

@@ -32,6 +32,7 @@ document.getElementById('seed').insertAdjacentHTML('beforebegin',String.raw`<div
 <aside id="chat" hidden aria-label="Chat about this idea">
   <header><div class="ct"><span class="lbl">Chat about</span><b id="chatT"></b></div><button id="chatX" title="Close chat (Esc)" aria-label="Close chat"></button></header>
   <div id="chatLog" role="log" aria-live="polite"></div>
+  <label class="cweb" id="chatWebRow" hidden><input type="checkbox" id="chatWeb"><span class="sw"></span><span id="chatWebL">Search the web</span></label>
   <div class="cin"><textarea id="chatMsg" rows="2" placeholder="Say what you're thinking about this idea…"></textarea><button id="chatSend" title="Send (Enter)" aria-label="Send"></button></div>
   <button id="chatGrow" class="cgrow"></button>
 </aside>
@@ -103,7 +104,7 @@ const MODES={
 let S=null, sel=new Set(), selEdge=null, undoS=[], redoS=[], V={x:0,y:0,k:1}, sample=null, growing=false, busy=new Set(), editing=null;
 let linkFrom=null;          // source node while in click-to-link mode
 // Per-idea chats live beside the map, not in it: chatting isn't an undo step and undo never loses messages.
-let CH={}, chatId=null, chatBusy=false;   // CH[nodeId] = [{r:'u'|'a', t:text}]
+let CH={}, chatId=null, chatBusy=false;   // CH[nodeId] = [{r:'u'|'a', t:text, src?:[{t,u}]}]
 const dragSet=new Set();    // nodes currently being dragged (survive re-renders)
 const AP={};                // display-only positions while a node animates in
 let epoch=0, loopId=0, loopP=null;      // epoch bumps when the whole map is replaced (new map / import)
@@ -118,9 +119,11 @@ function save(){try{localStorage.setItem(KEY,JSON.stringify({S,V,CH}))}catch(e){
 // Keep only well-formed chats for ideas that exist.
 function cleanChats(c,map){const o={};if(!c||typeof c!=='object'||!map)return o;
   for(const [k,a] of Object.entries(c)){if(!map.nodes[k]||!Array.isArray(a))continue;
-    const m=a.filter(x=>x&&(x.r==='u'||x.r==='a')&&typeof x.t==='string'&&x.t.trim()).slice(-200).map(x=>({r:x.r,t:x.t.slice(0,4000)}));
+    const m=a.filter(x=>x&&(x.r==='u'||x.r==='a')&&typeof x.t==='string'&&x.t.trim()).slice(-200).map(x=>{const o={r:x.r,t:x.t.slice(0,4000)},src=cleanSrc(x.src);if(src.length)o.src=src;return o});
     if(m.length)o[k]=m}
   return o}
+function cleanSrc(a){return Array.isArray(a)?a.filter(x=>x&&typeof x.u==='string'&&/^https?:\/\//i.test(x.u)).slice(0,8)
+  .map(x=>({t:String(x.t||x.u).slice(0,200),u:x.u.slice(0,1000)})):[]}
 const clip=t=>String(t==null?'':t).replace(/\s+/g,' ').trim();
 const num=(v,d=0)=>typeof v==='number'&&isFinite(v)?v:d;
 const IDRE=/^[A-Za-z0-9_-]{1,40}$/;
@@ -556,8 +559,13 @@ function drawChat(){
   if(!chatId)return;const log=$('chatLog'),msgs=CH[chatId]||[];log.innerHTML='';
   if(!msgs.length){const p=document.createElement('p');p.className='cempty';
     p.textContent=sample?'Say what this idea makes you think of. When you like where it\'s going, grow new ideas from the chat.':'Chat needs idea generation, which is only on inside claude.ai.';log.appendChild(p)}
-  msgs.forEach(m=>{const d=document.createElement('div');d.className='msg '+(m.r==='u'?'me':'ai');d.textContent=m.t;log.appendChild(d)});
-  if(chatBusy===chatId){const d=document.createElement('div');d.className='msg ai typing';d.innerHTML='<i></i><i></i><i></i>';log.appendChild(d)}
+  msgs.forEach(m=>{const d=document.createElement('div');d.className='msg '+(m.r==='u'?'me':'ai');d.textContent=m.t;
+    if(m.src&&m.src.length){const s=document.createElement('div');s.className='srcs';const h=document.createElement('span');h.textContent='Sources';s.appendChild(h);
+      m.src.forEach(x=>{const a=document.createElement('a');a.href=x.u;a.target='_blank';a.rel='noopener noreferrer';a.textContent=x.t;a.title=x.u;s.appendChild(a)});d.appendChild(s)}
+    log.appendChild(d)});
+  if(chatBusy===chatId){const d=document.createElement('div');d.className='msg ai typing';d.innerHTML='<i></i><i></i><i></i>'+(chatStatus?'<em></em>':'');
+    if(chatStatus)d.querySelector('em').textContent=chatStatus;log.appendChild(d)}
+  $('chatWebRow').hidden=!(web&&sample);$('chatWeb').checked=webOn;
   log.scrollTop=log.scrollHeight;
   $('chatSend').disabled=!sample||chatBusy===chatId;
   $('chatGrow').disabled=!sample||!msgs.some(m=>m.r==='u')||busy.has(chatId);
@@ -568,21 +576,54 @@ function closeChat(quiet){if(!chatId&&$('chat').hidden)return;chatId=null;$('cha
 async function sendChat(){
   const id=chatId,box=$('chatMsg'),t=box.value.trim();if(!id||!t||chatBusy)return;
   if(!sample)return toast('Chat needs idea generation, which is only on inside claude.ai.');
-  const first=!(CH[id]&&CH[id].length);(CH[id]=CH[id]||[]).push({r:'u',t});box.value='';autoH(box);chatBusy=id;save();if(first)render();drawChat();
-  const {prev}=bfs(),ep=epoch;
-  const prompt=head()+`Path from the question to this idea: ${pathTo(id,prev).join(' → ')}
+  const first=!(CH[id]&&CH[id].length);(CH[id]=CH[id]||[]).push({r:'u',t});box.value='';autoH(box);chatBusy=id;chatStatus=web&&webOn?'Thinking…':'';save();if(first)render();drawChat();
+  const {prev}=bfs(),ep=epoch,searching=!!(web&&webOn),found=[];
+  const base=head()+`Path from the question to this idea: ${pathTo(id,prev).join(' → ')}
 Idea we're talking about: "${N(id).text}"
-You're chatting with the user about this one idea. Build on what they say and add a fresh angle; never criticise. Reply in 2–4 short sentences of plain text (no lists, no JSON). End with at most one question.
-Conversation so far:
-${transcript(id)}
-You:`;
-  try{const r=await sample(prompt);const txt=String(typeof r==='string'?r:(r&&r.text)||'').trim();
+You're chatting with the user about this one idea. Build on what they say and add a fresh angle; never criticise. Reply in 2–4 short sentences of plain text (no lists, no JSON). End with at most one question.`;
+  const tail=`\nConversation so far:\n${transcript(id)}\nYou:`;
+  try{let r;
+    if(searching&&await toolsOk()){
+      r=await sample(base+`\nYou can search the web with the web_search tool. Use it when real examples, facts or what others have tried would help, then weave what you found into your reply. Don't paste URLs; the page lists your sources.`+tail,
+        {cache:false,tools:[{name:'web_search',description:'Search the web. Returns up to 5 results, each with a title, url and a short excerpt.',
+          inputSchema:{type:'object',properties:{objective:{type:'string',description:'What you are trying to find, in one sentence.'},
+            queries:{type:'array',items:{type:'string'},description:'1-3 keyword queries of 3-6 words each.'}},required:['objective','queries']},
+          execute:async(inp,ctx)=>webSearch(String(inp.objective||''),inp.queries,found,ctx&&ctx.signal)}]})}
+    else if(searching){   // this view can't run tools: search first, then answer from the results
+      let res=[];try{res=await webSearch(t+' (about: '+N(id).text+')',[N(id).text,t],found)}catch(e){toast(e.message)}
+      r=await sample(base+(res.length?`\nWeb results you may draw on (don't paste URLs):\n${JSON.stringify(res)}`:'')+tail)}
+    else r=await sample(base+tail);
+    const txt=String(typeof r==='string'?r:(r&&r.text)||'').trim();
     if(ep!==epoch||!S.nodes[id]||!CH[id])return;   // map replaced or idea deleted meanwhile
     if(!txt)throw new Error('the reply was empty');
-    CH[id].push({r:'a',t:txt});save()}
+    const m={r:'a',t:txt},src=cleanSrc(found);if(src.length)m.src=src;CH[id].push(m);save()}
   catch(e){aiError(e,'Could not reply')}
-  finally{chatBusy=null;if(chatId===id)drawChat()}
+  finally{chatBusy=null;chatStatus='';if(chatId===id)drawChat()}
 }
+/* web search through the viewer's Parallel Search connector (claude.ai only) */
+const WEB='Parallel Search',WSID=Array.from({length:32},()=>'0123456789abcdef'[Math.random()*16|0]).join('');
+let mcp=null,web=false,webOn=false,chatStatus='';
+try{webOn=localStorage.getItem('mindmapper-web')==='1'}catch(e){}
+async function toolsOk(){try{const l=sample.limits&&await sample.limits();return !!(l&&l.tools)}catch(e){return false}}
+const words=(q,n=6)=>clip(q).split(' ').filter(Boolean).slice(0,n).join(' ');
+async function webSearch(objective,queries,found,signal){
+  const qs=(Array.isArray(queries)?queries:[queries]).map(q=>words(String(q||''))).filter(Boolean).slice(0,3);
+  if(!qs.length)qs.push(words(objective));
+  chatStatus='Searching the web…';if(chatId)drawChat();
+  let res;try{res=await mcp.callTool(WEB,'web_search',{objective:clip(objective).slice(0,400)||qs[0],search_queries:qs,session_id:WSID},signal?{signal}:undefined)}
+  catch(e){const c=e&&e.code;
+    if(c==='server_not_connected'||c==='needs_reauth'||c==='not_in_manifest'||c==='blocked_by_policy'||c==='not_granted'||c==='capability_disabled'){
+      if(c!=='needs_reauth'){web=false;webOn=false}
+      throw new Error(c==='needs_reauth'?'Web search needs you to reconnect Parallel Search in claude.ai Settings → Connectors.':
+        c==='server_not_connected'?'Web search needs the Parallel Search connector. Add it in claude.ai Settings → Connectors.':'Web search isn\'t allowed for this map, so the chat will answer without it.')}
+    throw new Error('Web search didn\'t answer just now. Try again in a moment.')}
+  finally{chatStatus='Thinking…';if(chatId)drawChat()}
+  const p=res&&res.payload,list=(p&&Array.isArray(p.results)?p.results:[]).slice(0,5);
+  const out=list.map(x=>({title:clip(x.title).slice(0,160),url:String(x.url||''),excerpt:clip(Array.isArray(x.excerpts)?x.excerpts.join(' … '):x.excerpts||'').slice(0,700)}))
+    .filter(x=>/^https?:\/\//.test(x.url));
+  out.forEach(x=>{if(!found.some(f=>f.u===x.url))found.push({t:x.title||x.url,u:x.url})});
+  return out}
+$('chatWeb').onchange=e=>{webOn=e.target.checked;try{localStorage.setItem('mindmapper-web',webOn?'1':'0')}catch(_){}};
 function growFromChat(){const id=chatId;if(!id||!sample)return;
   grow(id,'yes',4,Infinity,transcript(id)).catch(()=>{}).finally(()=>{if(chatId===id)drawChat()});drawChat()}
 $('chatX').innerHTML=ic('x');$('chatSend').innerHTML=ic('send');$('chatGrow').innerHTML=ic('branch')+'Grow from this chat';
@@ -721,4 +762,7 @@ function buildMap(q,ctx,seeds){
 load();
 const seedSeeds=seedList();
 if(S){applyV();render()}else if(SEED&&clip(SEED.q)&&seedSeeds.length){buildMap(clip(SEED.q),clip(SEED.ctx),seedSeeds)}else openSetup();
-(async()=>{try{sample=window.claude&&typeof window.claude.use==='function'?await window.claude.use('sample'):null}catch(e){sample=null}if(S){ui();placeCtx()}})();
+(async()=>{try{sample=window.claude&&typeof window.claude.use==='function'?await window.claude.use('sample'):null}catch(e){sample=null}if(S){ui();placeCtx()}if(chatId)drawChat()})();
+(async()=>{try{mcp=window.claude&&typeof window.claude.use==='function'?await window.claude.use('mcp'):null;
+  if(mcp){const l=await mcp.listTools(WEB);web=!!(l&&l.servers||[]).some(s=>s.server===WEB&&(s.tools||[]).some(t=>t.name==='web_search'))}}catch(e){web=false}
+  if(chatId)drawChat()})();

@@ -178,6 +178,21 @@ svg.i{width:18px;height:18px;fill:none;stroke:currentColor;stroke-width:2;stroke
 #chatSend{width:38px;height:38px;flex:none;border-radius:50%;border:1.6px solid var(--ink);background:var(--red);color:#fff;-webkit-text-fill-color:#fff;display:grid;place-items:center;padding:0}
 #chatSend svg{stroke:#fff;width:16px;height:16px}
 #chatSend:disabled{opacity:.35;cursor:default}
+.cweb{display:flex;align-items:center;gap:8px;padding:8px 14px 0;font-size:13px;color:var(--soft);cursor:pointer;user-select:none;border-top:1.6px solid var(--line)}
+.cweb[hidden]{display:none}
+.cweb input{position:absolute;opacity:0;pointer-events:none}
+.cweb .sw{width:28px;height:16px;border-radius:999px;border:1.4px solid var(--ink);background:var(--card);position:relative;flex:none;transition:background .15s}
+.cweb .sw::after{content:"";position:absolute;left:2px;top:2px;width:9px;height:9px;border-radius:50%;background:var(--ink);transition:transform .15s}
+.cweb input:checked+.sw{background:var(--red)}
+.cweb input:checked+.sw::after{transform:translateX(12px);background:#fff}
+.cweb input:focus-visible+.sw{outline:2px solid var(--red);outline-offset:2px}
+.cweb input:checked~span:last-child{color:var(--ink);font-weight:600}
+.cweb+.cin{border-top:0}
+.msg .srcs{display:flex;flex-direction:column;gap:3px;margin-top:8px;padding-top:7px;border-top:1px dashed rgba(27,26,24,.35);font-size:12.5px;white-space:normal}
+.msg .srcs span{font-size:10.5px;letter-spacing:.1em;text-transform:uppercase;opacity:.7}
+.msg .srcs a{color:var(--ink);text-decoration:underline;text-underline-offset:2px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.msg.typing em{font-style:normal;font-size:12.5px;margin-left:6px;opacity:.75}
+.msg.typing{align-items:center}
 .cgrow{display:flex;align-items:center;justify-content:center;gap:8px;margin:2px 12px 12px;padding:10px;border:1.6px solid var(--ink);border-radius:999px;background:var(--ink);color:var(--paper);-webkit-text-fill-color:var(--paper);font-weight:600;font-size:14px}
 .cgrow svg{stroke:var(--paper)}
 .cgrow:disabled{opacity:.3;cursor:default}
